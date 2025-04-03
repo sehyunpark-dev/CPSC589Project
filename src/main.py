@@ -20,8 +20,9 @@ canvas = window.get_canvas()
 scene = window.get_scene()
 camera = ti.ui.Camera()
 
-canvas.set_background_color((0.0, 0.0, 0.0))
+canvas.set_background_color((1.0, 1.0, 1.0))
 model = OBJLoader("plane_8")
+model.debug_info()
 
 # Option variables
 def gui_options():

@@ -14,7 +14,6 @@ class OBJLoader:
                  rotation_axis=np.array([0,0,1], dtype=float),
                  rotation_degree=0.0, # degree
                  scale=np.array([1,1,1], dtype=float)):
-        ti.init(arch=ti.gpu)
 
         #######################################################################
         self.file_name = os.path.join(MODEL_DIR, file_name + ".obj")
