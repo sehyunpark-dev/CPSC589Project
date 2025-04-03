@@ -1,10 +1,11 @@
 import taichi as ti
 import numpy as np
 import trimesh
-import pyquaternion as pyq
+import os
 from pyquaternion import Quaternion
 
-dir_path = "../models/"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(BASE_DIR, "../models")
 
 class OBJLoader:
     def __init__(self,
@@ -16,9 +17,7 @@ class OBJLoader:
         ti.init(arch=ti.gpu)
 
         #######################################################################
-        # Declaring member variables
-
-        self.file_name = dir_path + file_name + ".obj"
+        self.file_name = os.path.join(MODEL_DIR, file_name + ".obj")
 
         # Numpy and mesh variables
         self.mesh = None
@@ -85,11 +84,11 @@ class OBJLoader:
 
             self.ti_vertices = ti.Vector.field(3, dtype=ti.f32, shape=self.num_vertices)
             self.ti_edges = ti.Vector.field(2, dtype=ti.i32, shape=self.num_edges)
-            self.ti_faces = ti.Vector.field(3, dtype=ti.i32, shape=self.num_faces)
+            self.ti_faces = ti.field(dtype=ti.i32, shape=3 * self.num_faces)
 
             self.ti_vertices.from_numpy(self.vertices_np.astype(np.float32))
-            self.ti_edges.from_numpy(self.edges_np.astype(np.float32))
-            self.ti_faces.from_numpy(self.faces_np.astype(np.float32))
+            self.ti_edges.from_numpy(self.edges_np.astype(np.int32))
+            self.ti_faces.from_numpy(self.faces_np.flatten().astype(np.int32))
 
         except Exception as e:
             print(f"Error filling Taichi fields: {e}")
