@@ -1,16 +1,21 @@
 ################################################################################
-# CPSC 589 : Modeling for Computer Graphics
+# CPSC 589 : Modeling for Computer Graphics Project
+# Real-Time Cloth Simulation Using Position-Based Dynamics and Parametric Surface Reconstruction
 # Sehyeon Park
 ################################################################################
-from turtledemo.penrose import start
 
 import taichi as ti
 import numpy as np
 
-ti.init(arch=ti.metal)
+from model_import import OBJLoader
+
+ti.init(arch=ti.gpu)
 
 global sim_running
 global sim_frame
+
+sim_running = False
+sim_frame = 0
 
 window = ti.ui.Window("CPSC 589 Project", (800, 600))
 gui = window.get_gui()
@@ -18,9 +23,8 @@ canvas = window.get_canvas()
 
 canvas.set_background_color((1.0, 1.0, 1.0))
 
+# Option variables
 def gui_options():
-    # Option variables
-
     with gui.sub_window("Options", 0.0, 0.0, 0.3, 0.7) as sub:
         start_pause_button = sub.button("Start/Pause")
         stop_button = sub.button("Stop")
