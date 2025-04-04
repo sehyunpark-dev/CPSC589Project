@@ -7,6 +7,7 @@ from pyquaternion import Quaternion
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "../models")
 
+@ti.data_oriented
 class OBJLoader:
     def __init__(self,
                  file_name: str,
