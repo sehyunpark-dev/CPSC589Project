@@ -1,12 +1,15 @@
 import numpy as np
 from pyquaternion import Quaternion
 
-class VirtualTrackball:
-    def __init__(self, window_width: int, window_height: int, radius :float = 1.0):
-        self.width = window_width
-        self.height = window_height
-        self.radius = radius
+class CameraController:
+    def __init__(self,
+                 radius: float = 1.0,
+                 max_dist: float = 20.0,
+                 min_dist: float = 2.0):
+        self.radius = 1.0
         self.current_quat = Quaternion()
+        self.max_dist = max_dist
+        self.min_dist = min_dist
         self.last_pos = None
         self.is_mouse_down = False
 
@@ -28,6 +31,7 @@ class VirtualTrackball:
     def on_mouse_release(self):
         self.is_mouse_down = False
         self.last_pos = None
+        self.current_quat = Quaternion()
 
     def on_mouse_drag(self, x: float, y: float) -> Quaternion:
         if not self.is_mouse_down:
@@ -57,6 +61,17 @@ class VirtualTrackball:
         self.last_pos = current_pos
         return self.current_quat
 
-    def reset(self):
-        self.current_quat = Quaternion()
-        self.last_pos = None
+    def zoom(self, current_camera_pos: np.ndarray, is_zoom_in: bool):
+        if is_zoom_in:
+            new_camera_pos = current_camera_pos / 1.1
+            new_norm = np.linalg.norm(new_camera_pos)
+            if new_norm < self.min_dist:
+                new_camera_pos = (new_camera_pos / new_norm) * self.min_dist
+
+        else:
+            new_camera_pos = current_camera_pos * 1.1
+            new_norm = np.linalg.norm(new_camera_pos)
+            if new_norm > self.max_dist:
+                new_camera_pos = (new_camera_pos / new_norm) * self.max_dist
+
+        return new_camera_pos
