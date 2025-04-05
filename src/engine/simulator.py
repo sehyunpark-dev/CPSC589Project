@@ -143,9 +143,8 @@ class ClothSimulator:
     def predict_x_tilde(self):
         # compute next step of x position approximately by using explicit euler...
         for i in range(self.num_vertices):
-            self.x_tilde[i] = (
-                    self.x_cur[i] + self.fixed[i] * (self.v[i] * self.dt +
-                                                     self.gravity * self.m_inv[i] * self.dt * self.dt))
+            self.x_tilde[i] = self.x_cur[i] + \
+                self.fixed[i] * (self.v[i] * self.dt + self.gravity * self.dt * self.dt)
 
     @ti.kernel
     def compute_v(self):

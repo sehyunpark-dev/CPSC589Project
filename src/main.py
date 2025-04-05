@@ -8,6 +8,7 @@ import taichi as ti
 import platform
 
 from src.utils.model_import import OBJLoader
+from src.utils.trackball import VirtualTrackball
 from src.engine.simulator import ClothSimulator
 
 def init_taichi():
@@ -27,29 +28,33 @@ def init_taichi():
           f" Arch: {machine}, "
           f"Using Taichi arch: {selected_arch}\n")
 
-def create_window():
-    window = ti.ui.Window("CPSC 589 Project", (800, 600))
+def create_window(window_width: int, window_height: int):
+    window = ti.ui.Window("CPSC 589 Project", (window_width, window_height))
     gui = window.get_gui()
     canvas = window.get_canvas()
     scene = window.get_scene()
     camera = ti.ui.Camera()
     return window, gui, canvas, scene, camera
 
-def setup_camera(camera):
-    camera.position(5.0, 5.0, 5.0)
+def setup_camera(camera, init_x, init_y, init_z):
+    camera.position(init_x, init_y, init_z)
     camera.lookat(0.0, 0.0, 0.0)
-    camera.fov(40.0)
+    camera.fov(45.0)
 
 ###############################################################################
 
 def main():
     init_taichi()
-    window, gui, canvas, scene, camera = create_window()
-    setup_camera(camera)
+    window_width, window_height = (800, 600)
+    window, gui, canvas, scene, camera = create_window(window_width, window_height)
+
+    camera_pos = [5.0, 5.0, 5.0]
+    setup_camera(camera, camera_pos[0], camera_pos[1], camera_pos[2])
     canvas.set_background_color((1.0, 1.0, 1.0))
 
     model = OBJLoader("plane_8", scale=[1.0, 1.0, 1.0])
-    simulator = ClothSimulator(model)
+    simulator = ClothSimulator(model, dt=0.001)
+    trackball = VirtualTrackball(window_width=window_width, window_height=window_height)
 
     sim_running = False
     sim_frame = 0
@@ -67,10 +72,27 @@ def main():
             sub.text(frame_str)
 
     while window.running:
-        setup_camera(camera)
         scene.set_camera(camera)
         scene.ambient_light((0.5, 0.5, 0.5))
         gui_options()
+
+        if window.get_event(ti.ui.PRESS):
+            if window.event.key == ti.ui.LMB:
+                cursor_pos = window.get_cursor_pos()
+                trackball.on_mouse_press(cursor_pos[0], cursor_pos[1])
+
+        if trackball.is_mouse_down:
+            cursor_pos = window.get_cursor_pos()
+            new_quat = trackball.on_mouse_drag(cursor_pos[0], cursor_pos[1])
+            rot_mat = new_quat.rotation_matrix
+
+            new_camera_pos = rot_mat @ camera_pos
+            camera.position(new_camera_pos[0], new_camera_pos[1], new_camera_pos[2])
+            camera.lookat(0.0, 0.0, 0.0)
+
+        if window.get_event(ti.ui.RELEASE):
+            if window.event.key == ti.ui.LMB:
+                trackball.on_mouse_release()
 
         if sim_running:
             simulator.step()
