@@ -10,6 +10,7 @@ import platform
 
 from src.utils.model_import import OBJLoader
 from src.utils.camera import CameraController
+from src.utils.vertices_selector import VerticesSelector
 from src.engine.simulator import ClothSimulator
 
 def init_taichi():
@@ -42,6 +43,27 @@ def setup_camera(camera, init_x, init_y, init_z):
     camera.lookat(0.0, 0.0, 0.0)
     camera.fov(45.0)
 
+@ti.kernel
+def extract_selected_particles(x_cur: ti.template(), selected_indices: ti.template(),
+                               selected_positions: ti.template(), num_vertices: ti.i32):
+    for i in range(num_vertices):
+        if selected_indices[i] == 1:
+            selected_positions[i] = x_cur[i]
+        else:
+            selected_positions[i] = ti.Vector([-10000.0, -10000.0, -10000.0])
+
+@ti.kernel
+def fix_selected_particles(selected: ti.template(), fixed: ti.template(), num_vertices: ti.i32):
+    for i in range(num_vertices):
+        if selected[i] == 1:
+            fixed[i] = 0.0
+            print("Vertex ", i, "is fixed")
+
+@ti.kernel
+def reset_fixed(fixed: ti.template(), num: ti.i32):
+    for i in range(num):
+        fixed[i] = 1.0
+
 ###############################################################################
 
 def main():
@@ -61,6 +83,10 @@ def main():
     model = OBJLoader("plane_8")
     simulator = ClothSimulator(model, dt=0.001)
     camera_controller = CameraController()
+    vertices_selector = VerticesSelector(window_width, window_height,
+                                         camera, canvas,
+                                         simulator.ti_vertices, simulator.num_vertices)
+    selected_positions = ti.Vector.field(3, dtype=ti.f32, shape=simulator.num_vertices)
 
     sim_running = False
     sim_frame = 0
@@ -93,7 +119,8 @@ def main():
 
             # Vertices selector
             elif window.event.key == ti.ui.RMB:
-                pass
+                cursor_pos = window.get_cursor_pos()
+                vertices_selector.on_mouse_press(cursor_pos[0], cursor_pos[1])
 
             # Zoom in
             elif window.event.key == ti.ui.UP:
@@ -109,6 +136,13 @@ def main():
                 camera.position(camera_pos[0], camera_pos[1], camera_pos[2])
                 camera.lookat(0.0, 0.0, 0.0)
 
+            elif window.event.key == 'f':
+                if vertices_selector.selected_indices is not None:
+                    fix_selected_particles(vertices_selector.selected_indices, simulator.fixed, simulator.num_vertices)
+
+            elif window.event.key == 'h':
+                reset_fixed(simulator.fixed, simulator.num_vertices)
+
         if window.get_event(ti.ui.RELEASE):
             # Virtual trackball (Rotation)
             if window.event.key == ti.ui.LMB:
@@ -117,7 +151,8 @@ def main():
 
             # Vertices selector
             if window.event.key == ti.ui.RMB:
-                pass
+                cursor_pos = window.get_cursor_pos()
+                vertices_selector.on_mouse_release(cursor_pos[0], cursor_pos[1])
 
         if camera_controller.is_mouse_down:
             cursor_pos = window.get_cursor_pos()
@@ -129,6 +164,11 @@ def main():
             camera.lookat(0.0, 0.0, 0.0)
             # Do not renew the camera position. Because it will be accumulated!
 
+        if vertices_selector.is_dragging:
+            cursor_pos = window.get_cursor_pos()
+            vertices_selector.on_mouse_drag(cursor_pos[0], cursor_pos[1])
+            vertices_selector.get_rect_lines()
+
         ################################################################################
         # Simulator
         if sim_running:
@@ -137,6 +177,11 @@ def main():
 
         ################################################################################
         # Canvas Renderer
+        if vertices_selector.selected_indices is not None:
+            extract_selected_particles(simulator.x_cur, vertices_selector.selected_indices, selected_positions,
+                                       simulator.num_vertices)
+            scene.particles(selected_positions, radius=0.01, color=(0.0, 0.0, 1.0))
+
         scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(1.0, 0.0, 0.0))
         scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(0.0, 0.0, 0.0), show_wireframe=True)
         canvas.scene(scene)
