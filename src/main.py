@@ -6,6 +6,7 @@
 
 import taichi as ti
 import numpy as np
+import time
 import platform
 
 from src.utils.model_import import OBJLoader
@@ -60,8 +61,9 @@ def fix_selected_particles(selected: ti.template(), fixed: ti.template(), num_ve
             print("Vertex ", i, "is fixed")
 
 @ti.kernel
-def reset_fixed(fixed: ti.template(), num: ti.i32):
-    for i in range(num):
+def reset_fixed(selected: ti.template(), fixed: ti.template(), num_vertices: ti.i32):
+    for i in range(num_vertices):
+        selected[i] = 0.0
         fixed[i] = 1.0
 
 ###############################################################################
@@ -69,30 +71,46 @@ def reset_fixed(fixed: ti.template(), num: ti.i32):
 def main():
     # Initialization
     init_taichi()
+
+    target_fps = 60.0
+    frame_duration = 1.0 / target_fps
+
     window_width, window_height = (800, 600)
     window, gui, canvas, scene, camera = create_window(window_width, window_height)
 
     # Camera setup
-    camera_pos = np.array([5.0, 5.0, 5.0])
+    camera_pos = np.array([3.0, 3.0, 3.0])
     new_camera_pos = camera_pos
 
     setup_camera(camera, camera_pos[0], camera_pos[1], camera_pos[2])
     canvas.set_background_color((1.0, 1.0, 1.0))
 
-    # Load objects
-    model = OBJLoader("plane_8")
-    simulator = ClothSimulator(model, dt=0.001)
+    # gui variables
+    sim_running = False
+    sim_frame = 0
+    stretch_stiffness_gui = 5e5
+    bending_stiffness_gui = 5e5
+    substeps_gui = 20
+
+    # Load objects (model, simulator, camera controller, vertices selector, etc.)
+    model = OBJLoader("plane_64")
+    simulator = ClothSimulator(model,
+                               dt=0.03,
+                               stretch_stiffness=stretch_stiffness_gui,
+                               bending_stiffness=bending_stiffness_gui,
+                               num_substeps=substeps_gui)
     camera_controller = CameraController()
     vertices_selector = VerticesSelector(window_width, window_height,
                                          camera, canvas,
                                          simulator.ti_vertices, simulator.num_vertices)
+
     selected_positions = ti.Vector.field(3, dtype=ti.f32, shape=simulator.num_vertices)
 
-    sim_running = False
-    sim_frame = 0
 
     def gui_options():
         nonlocal simulator, sim_running, sim_frame
+        nonlocal stretch_stiffness_gui, bending_stiffness_gui, substeps_gui
+
         with gui.sub_window("Options", 0.0, 0.0, 0.3, 0.7) as sub:
             if sub.button("Start/Pause"):
                 sim_running = not sim_running
@@ -100,10 +118,21 @@ def main():
                 sim_running = False
                 sim_frame = 0
                 simulator.reset()
+
+            stretch_stiffness_gui = sub.slider_float("Stretch Stiffness", stretch_stiffness_gui, 1e2, 1e6)
+            bending_stiffness_gui = sub.slider_float("Bending Stiffness", bending_stiffness_gui, 1e2, 1e6)
+            substeps_gui = sub.slider_int("Substeps", substeps_gui, 1, 100)
+
+            simulator.stretch_stiffness = stretch_stiffness_gui
+            simulator.bending_stiffness = bending_stiffness_gui
+            simulator.num_substeps = substeps_gui
+
             frame_str = "# Frame : " + str(sim_frame)
             sub.text(frame_str)
 
     while window.running:
+        frame_start = time.time()
+
         scene.set_camera(camera)
         scene.ambient_light((0.5, 0.5, 0.5))
         gui_options()
@@ -112,15 +141,15 @@ def main():
         # Event handler
 
         if window.get_event(ti.ui.PRESS):
-            # Virtual trackball (Rotation)
+            # Vertices selector
             if window.event.key == ti.ui.LMB:
                 cursor_pos = window.get_cursor_pos()
-                camera_controller.on_mouse_press(cursor_pos[0], cursor_pos[1])
+                vertices_selector.on_mouse_press(cursor_pos[0], cursor_pos[1])
 
-            # Vertices selector
+            # Virtual trackball (Rotation)
             elif window.event.key == ti.ui.RMB:
                 cursor_pos = window.get_cursor_pos()
-                vertices_selector.on_mouse_press(cursor_pos[0], cursor_pos[1])
+                camera_controller.on_mouse_press(cursor_pos[0], cursor_pos[1])
 
             # Zoom in
             elif window.event.key == ti.ui.UP:
@@ -140,19 +169,19 @@ def main():
                 if vertices_selector.selected_indices is not None:
                     fix_selected_particles(vertices_selector.selected_indices, simulator.fixed, simulator.num_vertices)
 
-            elif window.event.key == 'h':
-                reset_fixed(simulator.fixed, simulator.num_vertices)
+            elif window.event.key == 'r':
+                reset_fixed(vertices_selector.selected_indices, simulator.fixed, simulator.num_vertices)
 
         if window.get_event(ti.ui.RELEASE):
-            # Virtual trackball (Rotation)
-            if window.event.key == ti.ui.LMB:
-                camera_controller.on_mouse_release()
-                camera_pos = new_camera_pos
-
             # Vertices selector
-            if window.event.key == ti.ui.RMB:
+            if window.event.key == ti.ui.LMB:
                 cursor_pos = window.get_cursor_pos()
                 vertices_selector.on_mouse_release(cursor_pos[0], cursor_pos[1])
+
+            # Virtual trackball (Rotation)
+            elif window.event.key == ti.ui.RMB:
+                camera_controller.on_mouse_release()
+                camera_pos = new_camera_pos
 
         if camera_controller.is_mouse_down:
             cursor_pos = window.get_cursor_pos()
@@ -186,6 +215,12 @@ def main():
         scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(0.0, 0.0, 0.0), show_wireframe=True)
         canvas.scene(scene)
         window.show()
+
+        frame_end = time.time()
+        elapsed_time = frame_end - frame_start
+        sleep_time = frame_duration - elapsed_time
+        if sleep_time > 0:
+            time.sleep(sleep_time)
 
 if __name__ == '__main__':
     main()

@@ -1,14 +1,20 @@
 import taichi as ti
 import numpy as np
+from fontTools.subset.svg import xpath
+from fontTools.ttLib.tables.E_B_D_T_ import ebdt_bitmap_format_5
 
 from ..utils.model_import import OBJLoader
+from ..engine.solver import XPBDSolver
 
 @ti.data_oriented
 class ClothSimulator:
     def __init__(self,
                  mesh: OBJLoader,
                  dt=1.0 / 60.0,
-                 gravity=ti.math.vec3(0.0, -9.8, 0.0)):
+                 gravity=ti.math.vec3(0.0, -9.8, 0.0),
+                 stretch_stiffness=5e5,
+                 bending_stiffness=5e5,
+                 num_substeps=20):
         print("[Simulator] Initializing cloth simulator...")
 
         ######################################################################
@@ -54,6 +60,12 @@ class ClothSimulator:
         self.init_simulation_variables()
 
         print("[Simulator] Initialization done.")
+
+        self.stretch_stiffness = stretch_stiffness
+        self.bending_stiffness = bending_stiffness
+        self.num_substeps = num_substeps
+
+        self.xpbd_solver = XPBDSolver(self, self.num_substeps)
 
     ###########################################################################
     # Class functions
@@ -116,7 +128,7 @@ class ClothSimulator:
     def step(self):
         # XPBD-Based Cloth Simulation
         self.predict_x_tilde()
-        # Write code here to apply constraint
+        self.xpbd_solver.apply_constraints(self.stretch_stiffness, self.bending_stiffness, self.num_substeps)
         self.compute_v()
         self.update_x()
 
