@@ -5,16 +5,18 @@ from fontTools.ttLib.tables.E_B_D_T_ import ebdt_bitmap_format_5
 
 from ..utils.model_import import OBJLoader
 from ..engine.solver import XPBDSolver
+from ..engine.b_spline_surface import BSplineSurface
 
 @ti.data_oriented
 class ClothSimulator:
     def __init__(self,
-                 mesh: OBJLoader,
-                 dt=1.0 / 60.0,
+                 mesh: OBJLoader, dt=1.0 / 60.0,
                  gravity=ti.math.vec3(0.0, -9.8, 0.0),
-                 stretch_stiffness=5e5,
-                 bending_stiffness=5e5,
-                 num_substeps=20):
+                 stretch_stiffness=5e5, bending_stiffness=5e5,
+                 num_substeps=20,
+                 b_spline_num_u=9, b_spline_num_v=9,
+                 b_spline_res_u=50, b_spline_res_v=50,
+                 b_spline_order_u=4, b_spline_order_v=4):
         print("[Simulator] Initializing cloth simulator...")
 
         ######################################################################
@@ -57,6 +59,18 @@ class ClothSimulator:
         # for edges
         self.l0 = None
 
+        #######################################################################
+        # [B-spline Postprocess Variables]
+        #######################################################################
+        self.b_spline_num_u = b_spline_num_u
+        self.b_spline_num_v = b_spline_num_v
+        self.b_spline_res_u = b_spline_res_u
+        self.b_spline_res_v = b_spline_res_v
+        self.b_spline_order_u = b_spline_order_u
+        self.b_spline_order_v = b_spline_order_v
+
+        #######################################################################
+
         self.init_simulation_variables()
 
         print("[Simulator] Initialization done.")
@@ -66,6 +80,7 @@ class ClothSimulator:
         self.num_substeps = num_substeps
 
         self.xpbd_solver = XPBDSolver(self, self.num_substeps)
+        # self.bspline_surface = BSplineSurface(self,)
 
     ###########################################################################
     # Class functions
@@ -131,6 +146,9 @@ class ClothSimulator:
         self.xpbd_solver.apply_constraints(self.stretch_stiffness, self.bending_stiffness, self.num_substeps)
         self.compute_v()
         self.update_x()
+
+        # B-spline surface postprocess
+
 
     def reset(self):
         self.x_cur.copy_from(self.x0)

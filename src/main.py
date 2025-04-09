@@ -93,7 +93,7 @@ def main():
     substeps_gui = 20
 
     # Load objects (model, simulator, camera controller, vertices selector, etc.)
-    model = OBJLoader("plane_64")
+    model = OBJLoader("plane_8")
     simulator = ClothSimulator(model,
                                dt=0.03,
                                stretch_stiffness=stretch_stiffness_gui,
