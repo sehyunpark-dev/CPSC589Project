@@ -12,6 +12,8 @@ import platform
 from src.utils.model_import import OBJLoader
 from src.utils.camera import CameraController
 from src.utils.vertices_selector import VerticesSelector
+from src.engine.parametric_mapping import ParametricMapping
+from src.engine.b_spline_surface import BSplineSurfaceNP
 from src.engine.simulator import ClothSimulator
 
 def init_taichi():
@@ -92,13 +94,24 @@ def main():
     bending_stiffness_gui = 5e5
     substeps_gui = 20
 
-    # Load objects (model, simulator, camera controller, vertices selector, etc.)
+    # Load objects (model, uv_mapper, simulator, etc.)
     model = OBJLoader("plane_8")
+    uv_mapper = ParametricMapping(model.vertices_np)
     simulator = ClothSimulator(model,
                                dt=0.03,
                                stretch_stiffness=stretch_stiffness_gui,
                                bending_stiffness=bending_stiffness_gui,
                                num_substeps=substeps_gui)
+    num_u = 9  # 예: 9개
+    num_v = 9  # 예: 9개 → m_u = 8, m_v = 8
+    res_u, res_v = 50, 50  # 후처리 해상도
+    order_u, order_v = 4, 4  # Cubic
+
+    b_spline = BSplineSurfaceNP(model.vertices_np, uv_mapper.mapping,
+                              num_u, num_v, res_u, res_v,
+                              order_u=4, order_v=4)
+
+    # Load Utility objects (camera controller, vertices selector, etc.)
     camera_controller = CameraController()
     vertices_selector = VerticesSelector(window_width, window_height,
                                          camera, canvas,
@@ -118,6 +131,7 @@ def main():
                 sim_running = False
                 sim_frame = 0
                 simulator.reset()
+                b_spline.reset()
 
             stretch_stiffness_gui = sub.slider_float("Stretch Stiffness", stretch_stiffness_gui, 1e2, 1e6)
             bending_stiffness_gui = sub.slider_float("Bending Stiffness", bending_stiffness_gui, 1e2, 1e6)
@@ -202,6 +216,8 @@ def main():
         # Simulator
         if sim_running:
             simulator.step()
+            x_cur_np = simulator.x_cur.to_numpy()
+            b_spline.evaluate_surface_wrapper(x_cur_np)
             sim_frame += 1
 
         ################################################################################
@@ -211,8 +227,9 @@ def main():
                                        simulator.num_vertices)
             scene.particles(selected_positions, radius=0.01, color=(0.0, 0.0, 1.0))
 
-        scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(1.0, 0.0, 0.0))
-        scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(0.0, 0.0, 0.0), show_wireframe=True)
+        scene.mesh(b_spline.surface_points_field, indices=b_spline.surface_faces_field, color=(1.0, 0.0, 0.0))
+        # scene.mesh(b_spline.surface_points, indices=b_spline.ti_faces, color=(1.0, 0.0, 0.0))
+        # scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(0.0, 0.0, 0.0), show_wireframe=True)
         canvas.scene(scene)
         window.show()
 
