@@ -170,14 +170,12 @@ class ClothSimulator:
     def apply_wind(self):
         for i in range(self.num_vertices):
             if self.fixed[i] == 1.0:
-                # 기준 바람 방향
                 base_dir = ti.Vector([1.0, 0.2, 0.0]).normalized()
 
-                # 무작위 회전값 (약간의 흔들림)
-                angle_offset = (ti.random() - 0.5)  # 약 ±34도
-                axis = ti.Vector([0.0, 1.0, 0.0])  # y축 기준 회전
+                angle_offset = 5.0 * (ti.random() - 0.5)
+                axis = ti.Vector([0.0, 1.0, 0.0])
 
-                # Rodrigues' rotation formula를 적용해서 방향 회전
+                # Rodrigues' rotation formula
                 k = axis.normalized()
                 cos_theta = ti.cos(angle_offset)
                 sin_theta = ti.sin(angle_offset)
@@ -186,13 +184,9 @@ class ClothSimulator:
                            k * k.dot(base_dir) * (1.0 - cos_theta)
                 wind_dir = wind_dir.normalized()
 
-                # 바람 세기에도 약간의 무작위성
-                random_strength = self.wind_strength * (0.5 + ti.random())  # [0.5, 1.5]배
+                random_strength = self.wind_strength * (0.2 + 1.6 * ti.random())  # [0.2, 1.8] * self.wind_strength
 
-                # 최종 바람 힘
                 wind_force = wind_dir * random_strength
-
-                # 위치에 따라 바람이 덜 전달되도록 할 수도 있음 (선택)
                 self.x_tilde[i] += wind_force * self.dt * self.dt
 
     @ti.kernel

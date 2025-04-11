@@ -96,39 +96,69 @@ def main():
     use_bspline = True
 
     # Load objects (model, uv_mapper, simulator, etc.)
-    model = OBJLoader("plane_64", rotation_axis=[0,0,1], rotation_degree=90)
-    uv_mapper = ParametricMapping(model.vertices_np)
-    simulator = ClothSimulator(model,
-                               dt=0.03,
-                               stretch_stiffness=stretch_stiffness_gui,
-                               bending_stiffness=bending_stiffness_gui,
-                               num_substeps=substeps_gui)
+    model_8 = OBJLoader("plane_8", rotation_axis=[0, 0, 1], rotation_degree=90)
+    model_64 = OBJLoader("plane_64", rotation_axis=[0, 0, 1], rotation_degree=90)
 
-    num_u, num_v = 9, 9 # if the model is "plane_8", num_u, num_v should be 9.
-    res_u, res_v = 100, 100  # Postprocessing resolution
-    order_u, order_v = 4, 4  # Quadratic = 3, Cubic = 4, ...
-    b_spline = BSplineSurfaceNP(model.vertices_np, uv_mapper.mapping,
-                              num_u, num_v, res_u, res_v,
-                              order_u=order_u, order_v=order_v)
+    # model_8
+    uv_mapper_8 = ParametricMapping(model_8.vertices_np)
+    simulator_8 = ClothSimulator(model_8, dt=0.03, stretch_stiffness=5e5, bending_stiffness=5e5, num_substeps=20)
+    b_spline_8 = BSplineSurfaceNP(model_8.vertices_np, uv_mapper_8.mapping,
+                                  num_u=9, num_v=9, res_u=65, res_v=65, order_u=4, order_v=4)
+    selector_8 = VerticesSelector(window_width, window_height, camera, canvas,
+                                  simulator_8.ti_vertices, simulator_8.num_vertices)
+    selected_positions_8 = ti.Vector.field(3, dtype=ti.f32, shape=simulator_8.num_vertices)
+
+    # model_64
+    uv_mapper_64 = ParametricMapping(model_64.vertices_np)
+    simulator_64 = ClothSimulator(model_64, dt=0.03, stretch_stiffness=5e5, bending_stiffness=5e5, num_substeps=20)
+    b_spline_64 = BSplineSurfaceNP(model_64.vertices_np, uv_mapper_64.mapping,
+                                   num_u=65, num_v=65, res_u=100, res_v=100, order_u=4, order_v=4)
+    selector_64 = VerticesSelector(window_width, window_height, camera, canvas,
+                                   simulator_64.ti_vertices, simulator_64.num_vertices)
+    selected_positions_64 = ti.Vector.field(3, dtype=ti.f32, shape=simulator_64.num_vertices)
 
     # Load Utility objects (camera controller, vertices selector, etc.)
     camera_controller = CameraController()
-    vertices_selector = VerticesSelector(window_width, window_height,
-                                         camera, canvas,
-                                         simulator.ti_vertices, simulator.num_vertices)
 
-    selected_positions = ti.Vector.field(3, dtype=ti.f32, shape=simulator.num_vertices)
-
+    # init value
+    simulator = simulator_8
+    b_spline = b_spline_8
+    selector = selector_8
+    selected_positions = selected_positions_8
 
     def gui_options():
-        nonlocal simulator, sim_running, sim_frame
+        nonlocal simulator, b_spline, selector, selected_positions
+        nonlocal sim_running, sim_frame
         nonlocal stretch_stiffness_gui, bending_stiffness_gui, substeps_gui
         nonlocal use_bspline
 
         with gui.sub_window("Options", 0.0, 0.0, 0.3, 0.7) as sub:
             if sub.button("Start/Pause"):
                 sim_running = not sim_running
+
             if sub.button("Stop"):
+                sim_running = False
+                sim_frame = 0
+                simulator.reset()
+                b_spline.reset()
+
+            if sub.button("Use model_8"):
+                current_model = "model_8"
+                simulator = simulator_8
+                b_spline = b_spline_8
+                selector = selector_8
+                selected_positions = selected_positions_8
+                sim_running = False
+                sim_frame = 0
+                simulator.reset()
+                b_spline.reset()
+
+            if sub.button("Use model_64"):
+                current_model = "model_64"
+                simulator = simulator_64
+                b_spline = b_spline_64
+                selector = selector_64
+                selected_positions = selected_positions_64
                 sim_running = False
                 sim_frame = 0
                 simulator.reset()
@@ -137,7 +167,6 @@ def main():
             stretch_stiffness_gui = sub.slider_float("Stretch Stiffness", stretch_stiffness_gui, 1e2, 1e6)
             bending_stiffness_gui = sub.slider_float("Bending Stiffness", bending_stiffness_gui, 1e2, 1e6)
             substeps_gui = sub.slider_int("Substeps", substeps_gui, 1, 100)
-
             simulator.stretch_stiffness = stretch_stiffness_gui
             simulator.bending_stiffness = bending_stiffness_gui
             simulator.num_substeps = substeps_gui
@@ -163,7 +192,7 @@ def main():
             # Vertices selector
             if window.event.key == ti.ui.LMB:
                 cursor_pos = window.get_cursor_pos()
-                vertices_selector.on_mouse_press(cursor_pos[0], cursor_pos[1])
+                selector.on_mouse_press(cursor_pos[0], cursor_pos[1])
 
             # Virtual trackball (Rotation)
             elif window.event.key == ti.ui.RMB:
@@ -185,17 +214,17 @@ def main():
                 camera.lookat(0.0, 0.0, 0.0)
 
             elif window.event.key == 'f':
-                if vertices_selector.selected_indices is not None:
-                    fix_selected_particles(vertices_selector.selected_indices, simulator.fixed, simulator.num_vertices)
+                if selector.selected_indices is not None:
+                    fix_selected_particles(selector.selected_indices, simulator.fixed, simulator.num_vertices)
 
             elif window.event.key == 'r':
-                reset_fixed(vertices_selector.selected_indices, simulator.fixed, simulator.num_vertices)
+                reset_fixed(selector.selected_indices, simulator.fixed, simulator.num_vertices)
 
         if window.get_event(ti.ui.RELEASE):
             # Vertices selector
             if window.event.key == ti.ui.LMB:
                 cursor_pos = window.get_cursor_pos()
-                vertices_selector.on_mouse_release(cursor_pos[0], cursor_pos[1])
+                selector.on_mouse_release(cursor_pos[0], cursor_pos[1])
 
             # Virtual trackball (Rotation)
             elif window.event.key == ti.ui.RMB:
@@ -212,10 +241,10 @@ def main():
             camera.lookat(0.0, 0.0, 0.0)
             # Do not renew the camera position. Because it will be accumulated!
 
-        if vertices_selector.is_dragging:
+        if selector.is_dragging:
             cursor_pos = window.get_cursor_pos()
-            vertices_selector.on_mouse_drag(cursor_pos[0], cursor_pos[1])
-            vertices_selector.get_rect_lines()
+            selector.on_mouse_drag(cursor_pos[0], cursor_pos[1])
+            selector.get_rect_lines()
 
         ################################################################################
         # Simulator
@@ -227,8 +256,8 @@ def main():
 
         ################################################################################
         # Canvas Renderer
-        if vertices_selector.selected_indices is not None:
-            extract_selected_particles(simulator.x_cur, vertices_selector.selected_indices, selected_positions,
+        if selector.selected_indices is not None:
+            extract_selected_particles(simulator.x_cur, selector.selected_indices, selected_positions,
                                        simulator.num_vertices)
             scene.particles(selected_positions, radius=0.01, color=(0.0, 0.0, 1.0))
 
