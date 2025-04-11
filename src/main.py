@@ -13,7 +13,7 @@ from src.utils.model_import import OBJLoader
 from src.utils.camera import CameraController
 from src.utils.vertices_selector import VerticesSelector
 from src.engine.parametric_mapping import ParametricMapping
-from src.engine.b_spline_surface import BSplineSurfaceNP
+from src.engine.b_spline_surface import BSplineSurface
 from src.engine.simulator import ClothSimulator
 
 def init_taichi():
@@ -102,8 +102,8 @@ def main():
     # model_8
     uv_mapper_8 = ParametricMapping(model_8.vertices_np)
     simulator_8 = ClothSimulator(model_8, dt=0.03, stretch_stiffness=5e5, bending_stiffness=5e5, num_substeps=20)
-    b_spline_8 = BSplineSurfaceNP(model_8.vertices_np, uv_mapper_8.mapping,
-                                  num_u=9, num_v=9, res_u=65, res_v=65, order_u=4, order_v=4)
+    b_spline_8 = BSplineSurface(model_8.vertices_np, uv_mapper_8.mapping,
+                                num_u=9, num_v=9, res_u=65, res_v=65, order_u=4, order_v=4)
     selector_8 = VerticesSelector(window_width, window_height, camera, canvas,
                                   simulator_8.ti_vertices, simulator_8.num_vertices)
     selected_positions_8 = ti.Vector.field(3, dtype=ti.f32, shape=simulator_8.num_vertices)
@@ -111,8 +111,8 @@ def main():
     # model_64
     uv_mapper_64 = ParametricMapping(model_64.vertices_np)
     simulator_64 = ClothSimulator(model_64, dt=0.03, stretch_stiffness=5e5, bending_stiffness=5e5, num_substeps=20)
-    b_spline_64 = BSplineSurfaceNP(model_64.vertices_np, uv_mapper_64.mapping,
-                                   num_u=65, num_v=65, res_u=100, res_v=100, order_u=4, order_v=4)
+    b_spline_64 = BSplineSurface(model_64.vertices_np, uv_mapper_64.mapping,
+                                 num_u=65, num_v=65, res_u=100, res_v=100, order_u=4, order_v=4)
     selector_64 = VerticesSelector(window_width, window_height, camera, canvas,
                                    simulator_64.ti_vertices, simulator_64.num_vertices)
     selected_positions_64 = ti.Vector.field(3, dtype=ti.f32, shape=simulator_64.num_vertices)

@@ -1,14 +1,10 @@
 import taichi as ti
 import numpy as np
 
-MAX_ORDER = 10  # 최대 order (order_u, order_v가 이 값 이하라 가정)
+MAX_ORDER = 10 # <= order_u, order_v
 
-
-# NumPy 기반 helper 함수들 (리스트 대신 numpy 배열 사용)
-
-# BSplineSurfaceNP 클래스 (NumPy 기반)
 @ti.data_oriented
-class BSplineSurfaceNP:
+class BSplineSurface:
     def __init__(self,
                  control_vertices: np.ndarray,  # shape=(num_vertices,3)
                  uv_mapping: np.ndarray,  # shape=(num_vertices,2)
@@ -16,12 +12,11 @@ class BSplineSurfaceNP:
                  res_u: int, res_v: int,
                  order_u: int = 4, order_v: int = 4):
         """
-        입력:
           - control_vertices: numpy array, shape=(num_vertices, 3)
-          - uv_mapping: numpy array, shape=(num_vertices, 2) 각 control point의 (u,v) 값
-          - num_u, num_v: control net의 grid 크기 (num_vertices == num_u*num_v)
-          - res_u, res_v: 평가할 표면의 해상도
-          - order_u, order_v: B-spline order (예: 4이면 Cubic)
+          - uv_mapping: numpy array, shape=(num_vertices, 2) (u,v) value of each control point
+          - num_u, num_v: the grid size of u, v (num_vertices == num_u*num_v)
+          - res_u, res_v: resolution of postprocessed surface
+          - order_u, order_v: B-spline order (Cubic = 4, Quadratic = 3, ...)
         """
         self.control_vertices_init = control_vertices
         self.control_vertices = control_vertices
@@ -37,12 +32,12 @@ class BSplineSurfaceNP:
         self.m_u = num_u - 1
         self.m_v = num_v - 1
 
-        # 1. Control net 재배열 (numpy 방식; uv_mapping에 따라 재배치)
-        # control net을 2D grid로 재배열: shape=(num_u * num_v, 3)
+        # 1. Reorder control points by u,v order
         self.control_net_np = np.zeros(shape=(self.num_u * self.num_v, 3), dtype=np.float32)
         self.control_net_field = ti.Vector.field(3, dtype=ti.f32, shape=self.num_u * self.num_v)
         self.reorder_control_net_np()
 
+        # 2. Make new face indices by u,v order
         faces = []
         for i in range(self.res_u - 1):
             for j in range(self.res_v - 1):
@@ -60,18 +55,19 @@ class BSplineSurfaceNP:
         self.surface_faces_field = ti.field(dtype=ti.i32, shape=len(self.surface_faces_np))
         self.surface_faces_field.from_numpy(self.surface_faces_np)
 
-        # 2. Knot vector 생성 (NumPy)
+        # 3. Generate Knot vector (NumPy)
         self.U_np = self.make_knot_vector_np(self.num_u, self.order_u)
         self.V_np = self.make_knot_vector_np(self.num_v, self.order_v)
         self.num_U_knot = len(self.U_np)
         self.num_V_knot = len(self.V_np)
 
+        # Knot vector fields
         self.U = ti.field(dtype=ti.f32, shape=self.num_U_knot)
         self.V = ti.field(dtype=ti.f32, shape=self.num_V_knot)
         self.U.from_numpy(self.U_np)
         self.V.from_numpy(self.V_np)
 
-        # 3. Surface 평가 (Taichi 방식)
+        # 4. Evaluate surface
         self.surface_points_field = ti.Vector.field(3, dtype=ti.f32, shape=(self.res_u * self.res_v))
         self.evaluate_surface_wrapper(self.control_vertices)
 
@@ -154,18 +150,18 @@ class BSplineSurfaceNP:
         # Temporary matrix C to hold intermediate results after v-direction
         C = ti.Matrix.zero(ti.f32, MAX_ORDER, 3)
 
-        for i in range(self.order_u):  # u 방향
+        for i in range(self.order_u):  # u-direction
             row_idx = d_u - i
 
             # D: intermediate control points in v-direction
             D = ti.Matrix.zero(ti.f32, MAX_ORDER, 3)
-            for j in range(self.order_v):  # v 방향
+            for j in range(self.order_v):  # v-direction
                 col_idx = d_v - j
                 idx = row_idx * self.num_v + col_idx
                 for k in ti.static(range(3)):
                     D[j, k] = self.control_net_field[idx][k]
 
-            # v 방향 de Boor
+            # v-direction de Boor
             for r_offset in range(self.order_v - 2 + 1):  # r = order_v down to 2
                 r = self.order_v - r_offset
                 p = d_v
@@ -180,7 +176,7 @@ class BSplineSurfaceNP:
             for k in ti.static(range(3)):
                 C[i, k] = D[0, k]
 
-        # u 방향 de Boor
+        # u-direction de Boor
         for r_offset in range(self.order_u - 2 + 1):  # r = order_u down to 2
             r = self.order_u - r_offset
             p = d_u
