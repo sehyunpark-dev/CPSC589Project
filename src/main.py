@@ -93,23 +93,23 @@ def main():
     stretch_stiffness_gui = 5e5
     bending_stiffness_gui = 5e5
     substeps_gui = 20
+    use_bspline = True
 
     # Load objects (model, uv_mapper, simulator, etc.)
-    model = OBJLoader("plane_8")
+    model = OBJLoader("plane_64", rotation_axis=[0,0,1], rotation_degree=90)
     uv_mapper = ParametricMapping(model.vertices_np)
     simulator = ClothSimulator(model,
                                dt=0.03,
                                stretch_stiffness=stretch_stiffness_gui,
                                bending_stiffness=bending_stiffness_gui,
                                num_substeps=substeps_gui)
-    num_u = 9  # 예: 9개
-    num_v = 9  # 예: 9개 → m_u = 8, m_v = 8
-    res_u, res_v = 50, 50  # 후처리 해상도
-    order_u, order_v = 4, 4  # Cubic
 
+    num_u, num_v = 9, 9 # if the model is "plane_8", num_u, num_v should be 9.
+    res_u, res_v = 100, 100  # Postprocessing resolution
+    order_u, order_v = 4, 4  # Quadratic = 3, Cubic = 4, ...
     b_spline = BSplineSurfaceNP(model.vertices_np, uv_mapper.mapping,
                               num_u, num_v, res_u, res_v,
-                              order_u=4, order_v=4)
+                              order_u=order_u, order_v=order_v)
 
     # Load Utility objects (camera controller, vertices selector, etc.)
     camera_controller = CameraController()
@@ -123,6 +123,7 @@ def main():
     def gui_options():
         nonlocal simulator, sim_running, sim_frame
         nonlocal stretch_stiffness_gui, bending_stiffness_gui, substeps_gui
+        nonlocal use_bspline
 
         with gui.sub_window("Options", 0.0, 0.0, 0.3, 0.7) as sub:
             if sub.button("Start/Pause"):
@@ -141,6 +142,9 @@ def main():
             simulator.bending_stiffness = bending_stiffness_gui
             simulator.num_substeps = substeps_gui
 
+            use_bspline = sub.checkbox("Use B-spline Surface", use_bspline)
+            simulator.enable_wind = sub.checkbox("Enable Wind", simulator.enable_wind)
+
             frame_str = "# Frame : " + str(sim_frame)
             sub.text(frame_str)
 
@@ -149,6 +153,7 @@ def main():
 
         scene.set_camera(camera)
         scene.ambient_light((0.5, 0.5, 0.5))
+        scene.point_light((10.0, 10.0, 10.0), color=(0.5, 0.5, 0.5))
         gui_options()
 
         ################################################################################
@@ -227,9 +232,11 @@ def main():
                                        simulator.num_vertices)
             scene.particles(selected_positions, radius=0.01, color=(0.0, 0.0, 1.0))
 
-        scene.mesh(b_spline.surface_points_field, indices=b_spline.surface_faces_field, color=(1.0, 0.0, 0.0))
-        # scene.mesh(b_spline.surface_points, indices=b_spline.ti_faces, color=(1.0, 0.0, 0.0))
-        # scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(0.0, 0.0, 0.0), show_wireframe=True)
+        if use_bspline:
+            scene.mesh(b_spline.surface_points_field, indices=b_spline.surface_faces_field, color=(1.0, 1.0, 0.0))
+        else:
+            scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(1.0, 1.0, 0.0))
+        scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(0.0, 0.0, 0.0), show_wireframe=True)
         canvas.scene(scene)
         window.show()
 

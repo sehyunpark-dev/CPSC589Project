@@ -22,6 +22,7 @@ class ClothSimulator:
         self.mesh = mesh
         self.dt = dt
         self.gravity = gravity
+        self.sim_frame = 0
 
         #######################################################################
         # [Initialization Data]
@@ -55,6 +56,10 @@ class ClothSimulator:
         # for edges
         self.l0 = None
 
+        # for wind
+        self.enable_wind = False
+        self.wind_strength = 15.0
+
         #######################################################################
 
         self.init_simulation_variables()
@@ -66,7 +71,6 @@ class ClothSimulator:
         self.num_substeps = num_substeps
 
         self.xpbd_solver = XPBDSolver(self, self.num_substeps)
-        # self.bspline_surface = BSplineSurface(self,)
 
     ###########################################################################
     # Class functions
@@ -129,12 +133,12 @@ class ClothSimulator:
     def step(self):
         # XPBD-Based Cloth Simulation
         self.predict_x_tilde()
+        if self.enable_wind:
+            self.apply_wind()
         self.xpbd_solver.apply_constraints(self.stretch_stiffness, self.bending_stiffness, self.num_substeps)
         self.compute_v()
         self.update_x()
-
-        # B-spline surface postprocess
-
+        self.sim_frame += 1
 
     def reset(self):
         self.x_cur.copy_from(self.x0)
@@ -143,6 +147,7 @@ class ClothSimulator:
         self.dx.fill(0.0)
         self.dv.fill(0.0)
         self.nc.fill(0.0)
+        self.sim_frame = 0
 
     ###########################################################################
     # Kernel functions
@@ -157,10 +162,38 @@ class ClothSimulator:
 
     @ti.kernel
     def predict_x_tilde(self):
-        # compute next step of x position approximately by using explicit euler...
         for i in range(self.num_vertices):
             self.x_tilde[i] = self.x_cur[i] + \
-                self.fixed[i] * (self.v[i] * self.dt + self.gravity * self.dt * self.dt)
+                              self.fixed[i] * (self.v[i] * self.dt + self.gravity * self.dt * self.dt)
+
+    @ti.kernel
+    def apply_wind(self):
+        for i in range(self.num_vertices):
+            if self.fixed[i] == 1.0:
+                # 기준 바람 방향
+                base_dir = ti.Vector([1.0, 0.2, 0.0]).normalized()
+
+                # 무작위 회전값 (약간의 흔들림)
+                angle_offset = (ti.random() - 0.5)  # 약 ±34도
+                axis = ti.Vector([0.0, 1.0, 0.0])  # y축 기준 회전
+
+                # Rodrigues' rotation formula를 적용해서 방향 회전
+                k = axis.normalized()
+                cos_theta = ti.cos(angle_offset)
+                sin_theta = ti.sin(angle_offset)
+
+                wind_dir = base_dir * cos_theta + k.cross(base_dir) * sin_theta + \
+                           k * k.dot(base_dir) * (1.0 - cos_theta)
+                wind_dir = wind_dir.normalized()
+
+                # 바람 세기에도 약간의 무작위성
+                random_strength = self.wind_strength * (0.5 + ti.random())  # [0.5, 1.5]배
+
+                # 최종 바람 힘
+                wind_force = wind_dir * random_strength
+
+                # 위치에 따라 바람이 덜 전달되도록 할 수도 있음 (선택)
+                self.x_tilde[i] += wind_force * self.dt * self.dt
 
     @ti.kernel
     def compute_v(self):
