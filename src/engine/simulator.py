@@ -58,7 +58,7 @@ class ClothSimulator:
 
         # for wind
         self.enable_wind = False
-        self.wind_strength = 15.0
+        self.wind_strength = 50.0
 
         #######################################################################
 
@@ -172,7 +172,7 @@ class ClothSimulator:
             if self.fixed[i] == 1.0:
                 base_dir = ti.Vector([1.0, 0.2, 0.0]).normalized()
 
-                angle_offset = 5.0 * (ti.random() - 0.5)
+                angle_offset = 3.0 * (ti.random() - 0.5)
                 axis = ti.Vector([0.0, 1.0, 0.0])
 
                 # Rodrigues' rotation formula
@@ -184,7 +184,7 @@ class ClothSimulator:
                            k * k.dot(base_dir) * (1.0 - cos_theta)
                 wind_dir = wind_dir.normalized()
 
-                random_strength = self.wind_strength * (0.2 + 1.6 * ti.random())  # [0.2, 1.8] * self.wind_strength
+                random_strength = self.wind_strength * (0.5 + ti.random())  # [0.5, 1.5] * self.wind_strength
 
                 wind_force = wind_dir * random_strength
                 self.x_tilde[i] += wind_force * self.dt * self.dt
