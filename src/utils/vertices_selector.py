@@ -33,13 +33,14 @@ class VerticesSelector:
         self.drag_start = np.array([screen_x, screen_y])
 
     def on_mouse_drag(self, screen_x: float, screen_y: float):
-        if self.is_dragging:
+        if self.is_dragging and self.drag_start is not None:
             self.drag_end = np.array([screen_x, screen_y])
 
     def on_mouse_release(self, screen_x: float, screen_y: float):
         self.is_dragging = False
         self.drag_end = np.array([screen_x, screen_y])
-        self.compute_selection()
+        if self.drag_start is not None and self.drag_end is not None:
+            self.compute_selection()
 
     def get_rect_lines(self):
         if self.drag_start is None or self.drag_end is None:

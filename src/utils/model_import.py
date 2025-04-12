@@ -32,7 +32,7 @@ class OBJLoader:
         self.scale = scale
 
         self.load_obj()
-        print("[OBJLoader] Finished initializing OBJLoader.")
+        print("[OBJLoader] Finished initializing OBJLoader.\n")
 
     ###########################################################################
     # Class functions

@@ -64,13 +64,14 @@ class ClothSimulator:
 
         self.init_simulation_variables()
 
-        print("[Simulator] Initialization done.")
-
         self.stretch_stiffness = stretch_stiffness
         self.bending_stiffness = bending_stiffness
         self.num_substeps = num_substeps
 
         self.xpbd_solver = XPBDSolver(self, self.num_substeps)
+
+
+        print("[Simulator] Initialization done.\n")
 
     ###########################################################################
     # Class functions

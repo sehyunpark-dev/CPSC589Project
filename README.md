@@ -19,7 +19,7 @@ By simulating a **low-resolution mesh** and rendering a **high-resolution B-spli
 - **Real-time UI (ImGui)**
   - Toggle B-spline rendering
   - Adjust stiffness values and number of substeps
-  - Switch between `plane_8` and `plane_64` models
+  - Switch between `plane_8`, `plane_64`, and `skirt` models
   - Enable/disable wind
 - **Vertex selection & fixing**
   - Interactive vertex selection using the mouse
@@ -59,14 +59,15 @@ By simulating a **low-resolution mesh** and rendering a **high-resolution B-spli
 
 ### 🧩 GUI (ImGui Options)
 
-| Option                    | Description                                        |
-|---------------------------|----------------------------------------------------|
-| `Start/Pause`             | Toggle simulation running state                    |
-| `Stop`                    | Stop and reset the simulation                      |
-| `Use model_8`             | Switch to low-resolution cloth mesh                |
-| `Use model_64`            | Switch to high-resolution cloth mesh               |
-| `Stretch Stiffness`       | Adjust the stiffness of stretch constraints        |
-| `Bending Stiffness`       | Adjust the stiffness of bending constraints        |
-| `Substeps`                | Number of substeps for constraint solver           |
-| `Use B-spline Surface`    | Toggle between raw mesh or smooth B-spline surface |
-| `Enable Wind`             | Enable or disable wind force                       |
+| Option                 | Description                                        |
+|------------------------|----------------------------------------------------|
+| `Start/Pause`          | Toggle simulation running state                    |
+| `Stop`                 | Stop and reset the simulation                      |
+| `Use model_8`          | Switch to low-resolution cloth mesh                |
+| `Use model_64`         | Switch to high-resolution cloth mesh               |
+| `Use skirt`            | Switch to cylindrical skirt cloth mesh             |
+| `Stretch Stiffness`    | Adjust the stiffness of stretch constraints        |
+| `Bending Stiffness`    | Adjust the stiffness of bending constraints        |
+| `Substeps`             | Number of substeps for constraint solver           |
+| `Use B-spline Surface` | Toggle between raw mesh or smooth B-spline surface |
+| `Enable Wind`          | Enable or disable wind force                       |

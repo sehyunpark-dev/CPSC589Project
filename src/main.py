@@ -9,10 +9,13 @@ import numpy as np
 import time
 import platform
 
+from trimesh.graph import facets
+
 from src.utils.model_import import OBJLoader
 from src.utils.camera import CameraController
 from src.utils.vertices_selector import VerticesSelector
-from src.engine.parametric_mapping import ParametricMapping
+from src.engine.plane_uv_mapping import ParametricMapping
+from src.engine.cylinder_uv_mapping import CylindricalMapping
 from src.engine.b_spline_surface import BSplineSurface
 from src.engine.simulator import ClothSimulator
 
@@ -81,7 +84,7 @@ def main():
     window, gui, canvas, scene, camera = create_window(window_width, window_height)
 
     # Camera setup
-    camera_pos = np.array([3.0, 3.0, 3.0])
+    camera_pos = np.array([-3.0, 3.0, 3.0])
     new_camera_pos = camera_pos
 
     setup_camera(camera, camera_pos[0], camera_pos[1], camera_pos[2])
@@ -96,8 +99,9 @@ def main():
     use_bspline = True
 
     # Load objects (model, uv_mapper, simulator, etc.)
-    model_8 = OBJLoader("plane_8", rotation_axis=[0, 0, 1], rotation_degree=90)
-    model_64 = OBJLoader("plane_64", rotation_axis=[0, 0, 1], rotation_degree=90)
+    model_8 = OBJLoader("plane_8", rotation_axis=[0,0,1], rotation_degree=90)
+    model_64 = OBJLoader("plane_64", rotation_axis=[0,0,1], rotation_degree=90)
+    skirt = OBJLoader("skirt")
 
     # model_8
     uv_mapper_8 = ParametricMapping(model_8.vertices_np)
@@ -116,6 +120,16 @@ def main():
     selector_64 = VerticesSelector(window_width, window_height, camera, canvas,
                                    simulator_64.ti_vertices, simulator_64.num_vertices)
     selected_positions_64 = ti.Vector.field(3, dtype=ti.f32, shape=simulator_64.num_vertices)
+
+    uv_mapper_skirt = CylindricalMapping(skirt.vertices_np)
+    simulator_skirt = ClothSimulator(skirt, dt=0.03, stretch_stiffness=5e5, bending_stiffness=5e5, num_substeps=20)
+    b_spline_skirt = BSplineSurface(skirt.vertices_np, uv_mapper_skirt.mapping,
+                                    num_u=uv_mapper_skirt.num_u, num_v=uv_mapper_skirt.num_v,
+                                    res_u=uv_mapper_skirt.res_u, res_v=uv_mapper_skirt.res_v,
+                                    order_u=4, order_v=4, is_cylinder=True)
+    selector_skirt = VerticesSelector(window_width, window_height, camera, canvas,
+                                      simulator_skirt.ti_vertices, simulator_skirt.num_vertices)
+    selected_positions_skirt = ti.Vector.field(3, dtype=ti.f32, shape=simulator_skirt.num_vertices)
 
     # Load Utility objects (camera controller, vertices selector, etc.)
     camera_controller = CameraController()
@@ -164,6 +178,17 @@ def main():
                 simulator.reset()
                 b_spline.reset()
 
+            if sub.button("Use skirt"):
+                current_model = "skirt"
+                simulator = simulator_skirt
+                b_spline = b_spline_skirt
+                selector = selector_skirt
+                selected_positions = selected_positions_skirt
+                sim_running = False
+                sim_frame = 0
+                simulator.reset()
+                b_spline.reset()
+
             stretch_stiffness_gui = sub.slider_float("Stretch Stiffness", stretch_stiffness_gui, 1e2, 1e6)
             bending_stiffness_gui = sub.slider_float("Bending Stiffness", bending_stiffness_gui, 1e2, 1e6)
             substeps_gui = sub.slider_int("Substeps", substeps_gui, 1, 100)
@@ -175,7 +200,13 @@ def main():
             simulator.enable_wind = sub.checkbox("Enable Wind", simulator.enable_wind)
 
             frame_str = "# Frame : " + str(sim_frame)
+            vertices = "# vertices : " + str(simulator.num_vertices)
+            faces = "# faces : " + str(simulator.num_faces)
+            edges = "# edges : " + str(simulator.num_edges)
             sub.text(frame_str)
+            sub.text(vertices)
+            sub.text(faces)
+            sub.text(edges)
 
     while window.running:
         frame_start = time.time()

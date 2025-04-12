@@ -10,7 +10,8 @@ class BSplineSurface:
                  uv_mapping: np.ndarray,  # shape=(num_vertices,2)
                  num_u: int, num_v: int,
                  res_u: int, res_v: int,
-                 order_u: int = 4, order_v: int = 4):
+                 order_u: int = 5, order_v: int = 5,
+                 is_cylinder=False):
         """
           - control_vertices: numpy array, shape=(num_vertices, 3)
           - uv_mapping: numpy array, shape=(num_vertices, 2) (u,v) value of each control point
@@ -27,11 +28,13 @@ class BSplineSurface:
         self.res_v = res_v
         self.order_u = order_u
         self.order_v = order_v
+        self.is_cylinder = is_cylinder
 
         self.num_control_vertices = control_vertices.shape[0]
         self.m_u = num_u - 1
         self.m_v = num_v - 1
 
+        print("[B-spline] Initializing B-spline Surface...")
         # 1. Reorder control points by u,v order
         self.control_net_np = np.zeros(shape=(self.num_u * self.num_v, 3), dtype=np.float32)
         self.control_net_field = ti.Vector.field(3, dtype=ti.f32, shape=self.num_u * self.num_v)
@@ -71,6 +74,8 @@ class BSplineSurface:
         self.surface_points_field = ti.Vector.field(3, dtype=ti.f32, shape=(self.res_u * self.res_v))
         self.evaluate_surface_wrapper(self.control_vertices)
 
+        print("[B-spline] Initialization Done.\n")
+
     ###########################################################################
     # Numpy class functions
 
@@ -79,8 +84,14 @@ class BSplineSurface:
             u_val, v_val = self.uv_mapping[i]
             row = int(round(u_val * (self.num_u - 1)))
             col = int(round(v_val * (self.num_v - 1)))
-            self.control_net_np[row * self.num_u + col, :] = self.control_vertices[i]
+            self.control_net_np[row * self.num_v + col, :] = self.control_vertices[i]
+        if self.is_cylinder:
+            for i in range(self.num_v):
+                first_index = 0 * self.num_v + i
+                last_index = (self.num_u - 1) * self.num_v + i
+                self.control_net_np[first_index, :] = self.control_net_np[last_index, :]
         self.control_net_field.from_numpy(self.control_net_np)
+
 
     def make_knot_vector_np(self, n_ctrl: int, order: int) -> np.ndarray:
         L = n_ctrl + order
