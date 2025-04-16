@@ -41,22 +41,9 @@ class BSplineSurface:
         self.reorder_control_net_np()
 
         # 2. Make new face indices by u,v order
-        faces = []
-        for i in range(self.res_u - 1):
-            for j in range(self.res_v - 1):
-                # Vertex indices in the flattened 1D array
-                v0 = i * self.res_v + j
-                v1 = (i + 1) * self.res_v + j
-                v2 = (i + 1) * self.res_v + (j + 1)
-                v3 = i * self.res_v + (j + 1)
-
-                # Add two triangles per quad
-                faces.append([v0, v1, v2])
-                faces.append([v0, v2, v3])
-
-        self.surface_faces_np = np.array(faces, dtype=np.int32).reshape(-1)  # Flattened
-        self.surface_faces_field = ti.field(dtype=ti.i32, shape=len(self.surface_faces_np))
-        self.surface_faces_field.from_numpy(self.surface_faces_np)
+        self.surface_faces_np = None
+        self.surface_faces_field = None
+        self.make_faces_np()
 
         # 3. Generate Knot vector (NumPy)
         self.U_np = self.make_knot_vector_np(self.num_u, self.order_u)
@@ -92,6 +79,23 @@ class BSplineSurface:
                 self.control_net_np[first_index, :] = self.control_net_np[last_index, :]
         self.control_net_field.from_numpy(self.control_net_np)
 
+    def make_faces_np(self):
+        faces = []
+        for i in range(self.res_u - 1):
+            for j in range(self.res_v - 1):
+                # Vertex indices in the flattened 1D array
+                v0 = i * self.res_v + j
+                v1 = (i + 1) * self.res_v + j
+                v2 = (i + 1) * self.res_v + (j + 1)
+                v3 = i * self.res_v + (j + 1)
+
+                # Add two triangles per quad
+                faces.append([v0, v1, v2])
+                faces.append([v0, v2, v3])
+
+        self.surface_faces_np = np.array(faces, dtype=np.int32).reshape(-1)  # Flattened
+        self.surface_faces_field = ti.field(dtype=ti.i32, shape=len(self.surface_faces_np))
+        self.surface_faces_field.from_numpy(self.surface_faces_np)
 
     def make_knot_vector_np(self, n_ctrl: int, order: int) -> np.ndarray:
         L = n_ctrl + order
@@ -116,7 +120,6 @@ class BSplineSurface:
 
     @ti.kernel
     def evaluate_surface(self):
-        ti.loop_config(serialize=True)
         for idx in range(self.res_u * self.res_v):
             # Convert flat index to 2D (i,j)
             i = idx // self.res_v
