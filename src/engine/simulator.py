@@ -11,8 +11,7 @@ class ClothSimulator:
     def __init__(self,
                  mesh: OBJLoader, dt=1.0 / 60.0,
                  gravity=ti.math.vec3(0.0, -9.8, 0.0),
-                 stretch_stiffness=5e5, bending_stiffness=5e5,
-                 num_substeps=20):
+                 stretch_stiffness=5e5, num_substeps=20):
         print("[Simulator] Initializing cloth simulator...")
 
         ######################################################################
@@ -65,7 +64,6 @@ class ClothSimulator:
         self.init_simulation_variables()
 
         self.stretch_stiffness = stretch_stiffness
-        self.bending_stiffness = bending_stiffness
         self.num_substeps = num_substeps
 
         self.xpbd_solver = XPBDSolver(self, self.num_substeps)
@@ -136,7 +134,7 @@ class ClothSimulator:
         self.predict_x_tilde()
         if self.enable_wind:
             self.apply_wind()
-        self.xpbd_solver.apply_constraints(self.stretch_stiffness, self.bending_stiffness, self.num_substeps)
+        self.xpbd_solver.apply_constraints(self.stretch_stiffness, self.num_substeps)
         self.compute_v()
         self.update_x()
         self.sim_frame += 1

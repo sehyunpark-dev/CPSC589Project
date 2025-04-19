@@ -9,13 +9,12 @@ import numpy as np
 import time
 import platform
 
-from trimesh.graph import facets
 
 from src.utils.model_import import OBJLoader
 from src.utils.camera import CameraController
 from src.utils.vertices_selector import VerticesSelector
-from src.engine.plane_uv_mapping import ParametricMapping
-from src.engine.cylinder_uv_mapping import CylindricalMapping
+from src.utils.plane_uv_mapping import ParametricMapping
+from src.utils.cylinder_uv_mapping import CylindricalMapping
 from src.engine.b_spline_surface import BSplineSurface
 from src.engine.simulator import ClothSimulator
 
@@ -94,7 +93,6 @@ def main():
     sim_running = False
     sim_frame = 0
     stretch_stiffness_gui = 5e5
-    bending_stiffness_gui = 5e5
     substeps_gui = 20
     use_bspline = True
 
@@ -105,7 +103,7 @@ def main():
 
     # model_8
     uv_mapper_8 = ParametricMapping(model_8.vertices_np)
-    simulator_8 = ClothSimulator(model_8, dt=0.03, stretch_stiffness=5e5, bending_stiffness=5e5, num_substeps=20)
+    simulator_8 = ClothSimulator(model_8, dt=0.03, stretch_stiffness=5e5, num_substeps=20)
     b_spline_8 = BSplineSurface(model_8.vertices_np, uv_mapper_8.mapping,
                                 num_u=9, num_v=9, res_u=65, res_v=65, order_u=4, order_v=4)
     selector_8 = VerticesSelector(window_width, window_height, camera, canvas,
@@ -115,7 +113,7 @@ def main():
 
     # model_64
     uv_mapper_64 = ParametricMapping(model_64.vertices_np)
-    simulator_64 = ClothSimulator(model_64, dt=0.03, stretch_stiffness=5e5, bending_stiffness=5e5, num_substeps=20)
+    simulator_64 = ClothSimulator(model_64, dt=0.03, stretch_stiffness=5e5, num_substeps=20)
     b_spline_64 = BSplineSurface(model_64.vertices_np, uv_mapper_64.mapping,
                                  num_u=65, num_v=65, res_u=100, res_v=100, order_u=4, order_v=4)
     selector_64 = VerticesSelector(window_width, window_height, camera, canvas,
@@ -124,7 +122,7 @@ def main():
     selected_positions_64 = ti.Vector.field(3, dtype=ti.f32, shape=simulator_64.num_vertices)
 
     uv_mapper_skirt = CylindricalMapping(skirt.vertices_np)
-    simulator_skirt = ClothSimulator(skirt, dt=0.03, stretch_stiffness=5e5, bending_stiffness=5e5, num_substeps=20)
+    simulator_skirt = ClothSimulator(skirt, dt=0.03, stretch_stiffness=5e5, num_substeps=20)
     b_spline_skirt = BSplineSurface(skirt.vertices_np, uv_mapper_skirt.mapping,
                                     num_u=uv_mapper_skirt.num_u, num_v=uv_mapper_skirt.num_v,
                                     res_u=uv_mapper_skirt.res_u, res_v=uv_mapper_skirt.res_v,
@@ -146,7 +144,7 @@ def main():
     def gui_options():
         nonlocal simulator, b_spline, selector, selected_positions
         nonlocal sim_running, sim_frame
-        nonlocal stretch_stiffness_gui, bending_stiffness_gui, substeps_gui
+        nonlocal stretch_stiffness_gui, substeps_gui
         nonlocal use_bspline
 
         with gui.sub_window("Options", 0.0, 0.0, 0.3, 0.7) as sub:
@@ -193,10 +191,8 @@ def main():
                 b_spline.reset()
 
             stretch_stiffness_gui = sub.slider_float("Stretch Stiffness", stretch_stiffness_gui, 1e2, 1e6)
-            bending_stiffness_gui = sub.slider_float("Bending Stiffness", bending_stiffness_gui, 1e2, 1e6)
             substeps_gui = sub.slider_int("Substeps", substeps_gui, 1, 100)
             simulator.stretch_stiffness = stretch_stiffness_gui
-            simulator.bending_stiffness = bending_stiffness_gui
             simulator.num_substeps = substeps_gui
 
             use_bspline = sub.checkbox("Use B-spline Surface", use_bspline)
@@ -278,11 +274,26 @@ def main():
 
         ################################################################################
         # Simulator
+        # record_num_frames = 1000
+        # frame_times = []
         if sim_running:
+            # start_time = time.time()
+
             simulator.step()
+            # simulator.xpbd_solver.record_residual()
             x_cur_np = simulator.x_cur.to_numpy()
             b_spline.evaluate_surface_wrapper(x_cur_np)
             sim_frame += 1
+
+            # end_time = time.time()
+            # frame_times.append(end_time - start_time)
+
+            # if sim_frame == record_num_frames:
+            #     # simulator.xpbd_solver.save_residual_history()
+            #     avg_time = sum(frame_times) / len(frame_times)
+            #     fps = 1.0 / avg_time
+            #     print(f"Average time per frame: {avg_time * 1000:.2f} ms")
+            #     print(f"FPS: {fps:.2f}")
 
         ################################################################################
         # Canvas Renderer
@@ -306,11 +317,11 @@ def main():
         canvas.scene(scene)
         window.show()
 
-        frame_end = time.time()
-        elapsed_time = frame_end - frame_start
-        sleep_time = frame_duration - elapsed_time
-        if sleep_time > 0:
-            time.sleep(sleep_time)
+        # frame_end = time.time()
+        # elapsed_time = frame_end - frame_start
+        # sleep_time = frame_duration - elapsed_time
+        # if sleep_time > 0:
+        #     time.sleep(sleep_time)
 
 if __name__ == '__main__':
     main()

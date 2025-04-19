@@ -67,7 +67,6 @@ By simulating a **low-resolution mesh** and rendering a **high-resolution B-spli
 | `Use model_64`         | Switch to high-resolution cloth mesh               |
 | `Use skirt`            | Switch to cylindrical skirt cloth mesh             |
 | `Stretch Stiffness`    | Adjust the stiffness of stretch constraints        |
-| `Bending Stiffness`    | Adjust the stiffness of bending constraints        |
 | `Substeps`             | Number of substeps for constraint solver           |
 | `Use B-spline Surface` | Toggle between raw mesh or smooth B-spline surface |
 | `Enable Wind`          | Enable or disable wind force                       |
