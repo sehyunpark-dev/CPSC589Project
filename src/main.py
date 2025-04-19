@@ -300,11 +300,11 @@ def main():
         canvas.scene(scene)
         window.show()
 
-        # frame_end = time.time()
-        # elapsed_time = frame_end - frame_start
-        # sleep_time = frame_duration - elapsed_time
-        # if sleep_time > 0:
-        #     time.sleep(sleep_time)
+        frame_end = time.time()
+        elapsed_time = frame_end - frame_start
+        sleep_time = frame_duration - elapsed_time
+        if sleep_time > 0:
+            time.sleep(sleep_time)
 
 if __name__ == '__main__':
     main()
