@@ -1,5 +1,7 @@
 import numpy as np
 import taichi as ti
+from taichi.examples.rendering.oit_renderer import camera_pos
+
 
 @ti.data_oriented
 class VerticesSelector:
@@ -9,14 +11,19 @@ class VerticesSelector:
                  camera: ti.ui.Camera,
                  canvas,
                  ti_vertices: ti.Vector.field,
-                 num_vertices: int):
+                 num_vertices: int,
+                 ti_faces: ti.Vector.field,
+                 num_faces: int):
         self.window_width = window_width
         self.window_height = window_height
         self.camera = camera
         self.canvas = canvas
         self.ti_vertices = ti_vertices
         self.num_vertices = num_vertices
+        self.ti_faces = ti_faces
+        self.num_faces = num_faces
 
+        self.camera_pos = np.array([0, 0, 0])
         self.aspect = self.window_width / self.window_height
         self.drag_start = None
         self.drag_end = None
@@ -27,6 +34,9 @@ class VerticesSelector:
         # for drawing a selection rectangular
         self.ti_rect_vertices = ti.Vector.field(2, dtype=ti.f32, shape=4)
         self.ti_rect_indices = ti.Vector.field(2, dtype=ti.i32, shape=4)
+
+    def get_camera_pos(self, x, y, z):
+        self.camera_pos = np.array([x, y, z])
 
     def on_mouse_press(self, screen_x: float, screen_y: float):
         self.is_dragging = True
@@ -79,7 +89,8 @@ class VerticesSelector:
         self.compute_selection_kernel(self.ti_vertices, transform_ti,
                                       float(x_min), float(y_min),
                                       float(x_max), float(y_max),
-                                      float(self.window_width), float(self.window_height))
+                                      float(self.window_width), float(self.window_height),
+                                      ti.Vector(self.camera_pos.tolist()))
 
     @ti.kernel
     def compute_selection_kernel(self,
@@ -87,7 +98,8 @@ class VerticesSelector:
                                  transform: ti.template(),
                                  x_min: ti.f32, y_min: ti.f32,
                                  x_max: ti.f32, y_max: ti.f32,
-                                 win_width: ti.f32, win_height: ti.f32):
+                                 win_width: ti.f32, win_height: ti.f32,
+                                 cam_pos: ti.template()):
         for i in range(self.num_vertices):
             # world coord -> 4D homogeneous vector
             v_world = ti.Vector([vertices[i][0], vertices[i][1], vertices[i][2], 1.0])
@@ -101,4 +113,44 @@ class VerticesSelector:
             screen_y = (ndc[1] + 1.0) / 2.0
 
             if x_min <= screen_x <= x_max and y_min <= screen_y <= y_max:
-                self.selected_indices[i] = 1
+                ray_o = cam_pos
+                ray_d = (vertices[i] - ray_o).normalized()
+                dist_to_vertex = (vertices[i] - ray_o).norm()
+                visible = True
+
+                for j in range(self.ti_faces.shape[0]):
+                    f = self.ti_faces[j]
+                    if f[0] == i or f[1] == i or f[2] == i:
+                        continue
+                    p0 = vertices[f[0]]
+                    p1 = vertices[f[1]]
+                    p2 = vertices[f[2]]
+
+                    # Ray-triangle intersection
+                    eps = 1e-4
+                    edge1 = p1 - p0
+                    edge2 = p2 - p0
+                    h = ray_d.cross(edge2)
+                    a = edge1.dot(h)
+
+                    if abs(a) < eps:
+                        continue
+
+                    f_inv = 1.0 / a
+                    s = ray_o - p0
+                    u = f_inv * s.dot(h)
+                    if u < 0.0 or u > 1.0:
+                        continue
+
+                    q = s.cross(edge1)
+                    v = f_inv * ray_d.dot(q)
+                    if v < 0.0 or u + v > 1.0:
+                        continue
+
+                    t = f_inv * edge2.dot(q)
+                    if eps < t < dist_to_vertex:
+                        visible = False
+                        break
+
+                if visible:
+                    self.selected_indices[i] = 1

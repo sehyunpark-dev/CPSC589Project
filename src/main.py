@@ -109,7 +109,8 @@ def main():
     b_spline_8 = BSplineSurface(model_8.vertices_np, uv_mapper_8.mapping,
                                 num_u=9, num_v=9, res_u=65, res_v=65, order_u=4, order_v=4)
     selector_8 = VerticesSelector(window_width, window_height, camera, canvas,
-                                  simulator_8.ti_vertices, simulator_8.num_vertices)
+                                  simulator_8.ti_vertices, simulator_8.num_vertices,
+                                  simulator_8.ti_faces, simulator_8.num_faces)
     selected_positions_8 = ti.Vector.field(3, dtype=ti.f32, shape=simulator_8.num_vertices)
 
     # model_64
@@ -118,7 +119,8 @@ def main():
     b_spline_64 = BSplineSurface(model_64.vertices_np, uv_mapper_64.mapping,
                                  num_u=65, num_v=65, res_u=100, res_v=100, order_u=4, order_v=4)
     selector_64 = VerticesSelector(window_width, window_height, camera, canvas,
-                                   simulator_64.ti_vertices, simulator_64.num_vertices)
+                                   simulator_64.ti_vertices, simulator_64.num_vertices,
+                                   simulator_64.ti_faces, simulator_64.num_faces)
     selected_positions_64 = ti.Vector.field(3, dtype=ti.f32, shape=simulator_64.num_vertices)
 
     uv_mapper_skirt = CylindricalMapping(skirt.vertices_np)
@@ -128,7 +130,8 @@ def main():
                                     res_u=uv_mapper_skirt.res_u, res_v=uv_mapper_skirt.res_v,
                                     order_u=4, order_v=4, is_cylinder=True)
     selector_skirt = VerticesSelector(window_width, window_height, camera, canvas,
-                                      simulator_skirt.ti_vertices, simulator_skirt.num_vertices)
+                                      simulator_skirt.ti_vertices, simulator_skirt.num_vertices,
+                                      simulator_skirt.ti_faces, simulator_skirt.num_faces)
     selected_positions_skirt = ti.Vector.field(3, dtype=ti.f32, shape=simulator_skirt.num_vertices)
 
     # Load Utility objects (camera controller, vertices selector, etc.)
@@ -224,6 +227,7 @@ def main():
             if window.event.key == ti.ui.LMB:
                 cursor_pos = window.get_cursor_pos()
                 selector.on_mouse_press(cursor_pos[0], cursor_pos[1])
+                selector.get_camera_pos(camera_pos[0], camera_pos[1], camera_pos[2])
 
             # Virtual trackball (Rotation)
             elif window.event.key == ti.ui.RMB:
@@ -272,11 +276,6 @@ def main():
             camera.lookat(0.0, 0.0, 0.0)
             # Do not renew the camera position. Because it will be accumulated!
 
-        if selector.is_dragging:
-            cursor_pos = window.get_cursor_pos()
-            selector.on_mouse_drag(cursor_pos[0], cursor_pos[1])
-            selector.get_rect_lines()
-
         ################################################################################
         # Simulator
         if sim_running:
@@ -297,6 +296,13 @@ def main():
         else:
             scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(1.0, 1.0, 0.0))
         scene.mesh(simulator.x_cur, indices=simulator.ti_faces_flatten, color=(0.0, 0.0, 0.0), show_wireframe=True)
+
+        # Draw a selection square
+        if selector.is_dragging:
+            cursor_pos = window.get_cursor_pos()
+            selector.on_mouse_drag(cursor_pos[0], cursor_pos[1])
+            selector.get_rect_lines()
+
         canvas.scene(scene)
         window.show()
 
