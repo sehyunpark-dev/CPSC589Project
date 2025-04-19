@@ -34,6 +34,8 @@ By simulating a **low-resolution mesh** and rendering a **high-resolution B-spli
 - Taichi
 - NumPy
 - TriMesh
+- PyQuaternion
+- Matplotlib
 
 ## 🎮 Controls
 

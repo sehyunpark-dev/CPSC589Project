@@ -35,7 +35,7 @@ class XPBDSolver:
         print(f"[XPBD] Residual history saved to {filepath}")
 
     @ti.kernel
-    def solve_distance_constraints(self, compliance_stretch: ti.f32, compliance_bending: ti.f32):
+    def solve_distance_constraints(self, compliance_stretch: ti.f32):
         ti.loop_config(serialize=True)
         for i in range(self.simulator.num_edges):
             l0 = self.simulator.l0[i]
